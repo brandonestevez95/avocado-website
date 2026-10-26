@@ -28,7 +28,7 @@ img{max-width:100%;display:block;}
 /* ---- HERO ---- */
 .hero{position:relative;overflow:hidden;background:var(--forest);
   min-height:min(520px,70vw);display:flex;align-items:center;justify-content:center;}
-.hero-art{position:absolute;inset:0;width:100%;height:100%;}
+.hero-art{position:absolute;inset:0;width:100%;height:100%;background:radial-gradient(ellipse at 50% 55%,#3C5A2A 0%,#1F3A2E 70%);}
 .hero-scrim{position:absolute;inset:0;
   background:
     radial-gradient(ellipse 60% 60% at 50% 46%, rgba(8,14,10,.72) 0%, rgba(8,14,10,.25) 60%, rgba(8,14,10,0) 100%),
@@ -52,10 +52,6 @@ a.hero-tag:hover{background:#fff;color:var(--forest);border-color:#fff;}
   .hero-tag{font-size:.6rem;letter-spacing:.08em;padding:6px 11px;}
 }
 
-/* contour lines drift slowly, like the main site's map tiles drawing themselves */
-.contour{fill:none;stroke:rgba(232,179,61,.28);stroke-width:1.4;stroke-dasharray:900;stroke-dashoffset:900;
-  animation:drawc 14s ease-in-out infinite;}
-@keyframes drawc{0%{stroke-dashoffset:900;}35%{stroke-dashoffset:0;}75%{stroke-dashoffset:0;}100%{stroke-dashoffset:-900;}}
 
 /* ---- STAT RIBBON (echoes the dark map ribbon) ---- */
 .ribbon{background:#14181A;padding:40px 24px 44px;}
@@ -138,8 +134,11 @@ h2{font-family:'Overpass',sans-serif;font-weight:800;font-size:clamp(1.9rem,4vw,
 .viewer{margin-top:52px;}
 .viewer-stage{position:relative;background:var(--spooky);border-radius:12px;overflow:hidden;
   box-shadow:0 18px 40px rgba(28,34,38,.18);aspect-ratio:16/9;}
-.viewer-stage img{width:100%;height:100%;object-fit:cover;transition:opacity .25s;}
-.viewer-stage img.swap{opacity:0;}
+.slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .35s ease;pointer-events:none;}
+.slide.on{opacity:1;}
+.slide-fallback{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;
+  background:var(--spooky);color:var(--ink);font-family:'Overpass',sans-serif;font-size:clamp(1rem,2.4vw,1.6rem);}
+.slide-fallback a{pointer-events:auto;font-family:'Jost',sans-serif;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;font-weight:600;border-bottom:1.5px solid var(--ink);text-decoration:none;}
 .vbtn{position:absolute;top:50%;transform:translateY(-50%);width:46px;height:46px;border-radius:50%;
   border:1.5px solid rgba(28,34,38,.6);background:rgba(250,247,240,.88);color:var(--ink);font-size:1.2rem;cursor:pointer;
   display:flex;align-items:center;justify-content:center;transition:background .2s,transform .2s;font-family:'DM Sans',sans-serif;}
@@ -162,6 +161,9 @@ h2{font-family:'Overpass',sans-serif;font-weight:800;font-size:clamp(1.9rem,4vw,
 .back .btn{color:#fff;border-color:rgba(255,255,255,.6);}
 .back .btn:hover{background:#fff;color:var(--forest);}
 
+.ack{max-width:720px;margin:0 auto;padding:64px 24px 56px;text-align:center;}
+.ack p{font-size:1.02rem;line-height:1.75;color:#3A3D34;}
+.ack strong{color:var(--ink);}
 footer{border-top:1px solid var(--line);padding:32px;text-align:center;
   font-family:'Jost',sans-serif;font-size:.78rem;letter-spacing:.04em;color:var(--stone);}
 footer a{text-decoration:none;border-bottom:1px solid var(--line);}
@@ -171,7 +173,6 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--coral);outline-offs
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto;}
   .reveal{opacity:1;transform:none;transition:none;}
-  .contour{animation:none;stroke-dashoffset:0;}
 }
 </style>
 <noscript><style>.reveal{opacity:1;transform:none;}</style></noscript>
@@ -179,25 +180,9 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--coral);outline-offs
 <body>
 
 <div class="hero">
-  <svg class="hero-art" viewBox="0 0 1500 520" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <defs>
-      <radialGradient id="glow" cx="50%" cy="55%" r="65%">
-        <stop offset="0" stop-color="#3C5A2A"/><stop offset="1" stop-color="#1F3A2E"/>
-      </radialGradient>
-    </defs>
-    <rect width="1500" height="520" fill="url(#glow)"/>
-    <g transform="translate(750 270)">
-      <ellipse class="contour" rx="640" ry="230" style="animation-delay:0s"/>
-      <ellipse class="contour" rx="540" ry="196" style="animation-delay:.6s"/>
-      <ellipse class="contour" rx="440" ry="162" style="animation-delay:1.2s"/>
-      <ellipse class="contour" rx="340" ry="128" style="animation-delay:1.8s"/>
-      <ellipse class="contour" rx="240" ry="94" style="animation-delay:2.4s"/>
-      <ellipse class="contour" rx="140" ry="60" style="animation-delay:3s"/>
-    </g>
-  </svg>
+  <canvas class="hero-art" id="net" aria-hidden="true"></canvas>
   <div class="hero-scrim"></div>
   <div class="hero-text">
-    <div class="hero-kicker">Fall 2026 Spooky Research Slam · NC State ARE</div>
     <h1 class="hero-name">Ripe for Disaster</h1>
     <p class="hero-sub">Where supply chains break</p>
     <div class="hero-tags">
@@ -323,7 +308,13 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--coral);outline-offs
 
     <div class="viewer reveal" id="viewer">
       <div class="viewer-stage">
-        <img id="vimg" src="assets/slides/slide-1.jpg" alt="Slide 1" width="1500" height="844" />
+        <img class="slide on" src="assets/slides/slide-1.jpg" alt="Slide 1: Title: Ripe for Disaster, Where Supply Chains Break" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-2.jpg" alt="Slide 2: Michoacán: about 3 in 4 of Mexico’s avocados, 90% of exports to the US" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-3.jpg" alt="Slide 3: The price tag leaves some things out: water, forests, conflict" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-4.jpg" alt="Slide 4: Visualizing the problem with GIS: collect, match, map" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-5.jpg" alt="Slide 5: Where the avocados are: 80% to 73%, 2014 vs 2024 map" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-6.jpg" alt="Slide 6: What the price tag leaves out: homicides vs tree cover loss map" width="1500" height="844" decoding="async">
+        <img class="slide" src="assets/slides/slide-7.jpg" alt="Slide 7: Questions? Contact Brandon Estevez" width="1500" height="844" decoding="async">
         <button class="vbtn prev" id="vprev" aria-label="Previous slide">←</button>
         <button class="vbtn next" id="vnext" aria-label="Next slide">→</button>
       </div>
@@ -342,10 +333,170 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--coral);outline-offs
   <a class="btn" href="https://www.brandonestevez.com">Back to brandonestevez.com</a>
 </div>
 
+<div class="ack">
+  <div class="eyebrow">Acknowledgments</div>
+  <p>This research is paid for through the <strong>Federal Work-Study program</strong> under the <strong>Office of Undergraduate Research</strong> at NC State University. My faculty mentor is <strong>Dr. Kelsey Vourazeris</strong>, Department of Agricultural and Resource Economics.</p>
+</div>
+
 <footer>© 2026 Brandon Estevez · Raleigh, NC · <a href="https://www.brandonestevez.com">brandonestevez.com</a></footer>
 
 <script>
 (function(){
+
+  // Hero: a supply chain growing on slow orbits. Dots sit on concentric eclipse-like rings and link
+  // with sweeping arcs; comets of light carry goods along them; a route breaks, heals, and it regrows.
+  (function(){
+    var cv=document.getElementById('net'); if(!cv||!cv.getContext) return;
+    var ctx=cv.getContext('2d'),W=0,H=0,cx=0,cy=0,s=.4,Rmax=0,gap=0,K=7,nodes=[],edges=[],pulses=[];
+    var target=0,frame=0,phase='grow',hold=0,fade=1,raf=0,visible=true,theta=0;
+    var still=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+    var CORAL='232,115,90',WARM='255,247,226',GOLD='240,200,100',TEAL='120,214,206',WHITE='255,255,255',plan=[];
+    function rnd(a,b){return a+Math.random()*(b-a);}
+    function size(){
+      var r=cv.getBoundingClientRect();W=r.width;H=r.height;var d=Math.min(window.devicePixelRatio||1,2);
+      cv.width=W*d;cv.height=H*d;ctx.setTransform(d,0,0,d,0,0);
+      cx=W/2;cy=H/2;Rmax=W*.6;s=Math.max(.3,Math.min(.9,H*.56/Rmax));gap=Rmax/K;
+      target=Math.max(70,Math.min(150,Math.round(W*H/5600)));
+    }
+    function pos(n){var a=n.phi+theta;return {X:n.r*Math.cos(a),Y:n.r*Math.sin(a)};}
+    function proj(p){return {x:cx+p.X,y:cy+p.Y*s};}
+    function buildPlan(){
+      // every ring gets evenly spread slots all the way round; rings fill from the centre out,
+      // slots within a ring are shuffled so dots pop up all around, not along one side
+      var sum=K*(K+1)/2,out=[];
+      for(var k=1;k<=K;k++){
+        var n=Math.max(4,Math.round((target-1)*k/sum)),off=rnd(0,6.283),row=[];
+        for(var i=0;i<n;i++)row.push({k:k,phi:off+i/n*6.283+rnd(-.12,.12)*6.283/n});
+        for(var j=row.length-1;j>0;j--){var m=Math.floor(Math.random()*(j+1)),t=row[j];row[j]=row[m];row[m]=t;}
+        out=out.concat(row);
+      }
+      return out;
+    }
+    function reset(){nodes=[{k:0,r:0,phi:0,s:0,big:true,ph:rnd(0,6),R:7,col:WHITE}];edges=[];pulses=[];plan=buildPlan();phase='grow';hold=0;fade=1;}
+    function cdist(a,b){var p=pos(a),q=pos(b);return Math.hypot(p.X-q.X,p.Y-q.Y);}
+    function addNode(){
+      var sl=plan.shift();if(!sl){return;}
+      var rr=Math.random(),col=rr<.72?WHITE:rr<.86?GOLD:TEAL;
+      var n={k:sl.k,r:sl.k*gap+rnd(-8,8),phi:sl.phi,s:0,ph:rnd(0,6.283),R:Math.random()<.1?rnd(3.6,4.6):rnd(1.5,2.8),col:col};
+      n.big=n.R>3.4;
+      var idx=nodes.length;
+      var near=nodes.map(function(o,q){return {i:q,d:cdist(n,o)};}).sort(function(p,q){return p.d-q.d;});
+      nodes.push(n);
+      var links=[near[0].i];
+      near.slice(1,4).forEach(function(o){if(o.d<gap*1.9&&links.length<3&&Math.random()<.7)links.push(o.i);});
+      links.forEach(function(q){edges.push({a:q,b:idx,p:0,broken:0,heal:0,flash:0,col:col});});
+    }
+    // quadratic arc between two nodes, always bulging the same rotational way so arcs swirl
+    function arc(e){
+      var A=pos(nodes[e.a]),B=pos(nodes[e.b]),dx=B.X-A.X,dy=B.Y-A.Y,L=Math.hypot(dx,dy)||1,
+          bulge=Math.min(L*.28,70);
+      var C={X:(A.X+B.X)/2-dy/L*bulge,Y:(A.Y+B.Y)/2+dx/L*bulge};
+      return [proj(A),proj(C),proj(B)];
+    }
+    function bez(q,t){var u=1-t;return {x:u*u*q[0].x+2*u*t*q[1].x+t*t*q[2].x,y:u*u*q[0].y+2*u*t*q[1].y+t*t*q[2].y};}
+    function strokeArc(q,t0,t1){
+      var N=22,p=bez(q,t0);ctx.beginPath();ctx.moveTo(p.x,p.y);
+      for(var i=1;i<=N;i++){p=bez(q,t0+(t1-t0)*i/N);ctx.lineTo(p.x,p.y);}
+      ctx.stroke();
+    }
+    function adj(i){var o=[];edges.forEach(function(e,k){if(e.p>=1&&!e.broken){if(e.a===i)o.push([k,e.b]);else if(e.b===i)o.push([k,e.a]);}});return o;}
+    function spawn(){
+      var st=Math.floor(Math.random()*nodes.length),o=adj(st);if(!o.length)return;
+      var pk=o[Math.floor(Math.random()*o.length)];
+      var rc=Math.random();pulses.push({col:rc<.6?WARM:rc<.8?GOLD:TEAL,e:pk[0],from:st,t:0,sp:rnd(.006,.012),hops:Math.floor(rnd(3,8)),stall:0});
+    }
+    function breakOne(){
+      var ok=edges.filter(function(e){return e.p>=1&&!e.broken;});if(!ok.length)return;
+      var e=ok[Math.floor(Math.random()*ok.length)];e.broken=1;e.flash=1;e.heal=rnd(150,260);
+    }
+    function glow(x,y,r,a,col){
+      var g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,'rgba('+col+','+a+')');g.addColorStop(1,'rgba('+col+',0)');
+      ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,6.283);ctx.fill();
+    }
+    function sparkle(x,y,r,a){
+      ctx.strokeStyle='rgba('+WARM+','+a+')';ctx.lineWidth=1;ctx.beginPath();
+      ctx.moveTo(x-r,y);ctx.lineTo(x+r,y);ctx.moveTo(x,y-r);ctx.lineTo(x,y+r);ctx.stroke();
+    }
+    function draw(){
+      ctx.clearRect(0,0,W,H);ctx.globalAlpha=fade;
+      // orbit rings fade in as the network reaches them
+      var maxK=0;nodes.forEach(function(n){if(n.k>maxK)maxK=n.k;});
+      for(var k=1;k<=K;k++){
+        var al=k<=maxK?.09:0;if(!al)continue;
+        ctx.beginPath();ctx.ellipse(cx,cy,k*gap,k*gap*s,0,0,6.283);
+        ctx.strokeStyle='rgba(255,255,255,'+al+')';ctx.lineWidth=1;ctx.stroke();
+      }
+      // arcs
+      ctx.lineCap='round';
+      edges.forEach(function(e){
+        var q=arc(e);e._q=q;
+        if(e.broken){
+          ctx.strokeStyle='rgba('+CORAL+','+(.6+Math.max(0,e.flash)*.35)+')';ctx.lineWidth=1.4;
+          strokeArc(q,0,.43);strokeArc(q,.57,1);
+          var m=bez(q,.5);ctx.beginPath();ctx.arc(m.x,m.y,3+Math.max(0,e.flash)*11,0,6.283);
+          ctx.strokeStyle='rgba('+CORAL+','+(.3+e.flash*.3)+')';ctx.lineWidth=1;ctx.stroke();
+        }else{
+          ctx.strokeStyle='rgba('+e.col+','+(e.p<1?.55:(e.col===WHITE?.22:.32))+')';ctx.lineWidth=1;strokeArc(q,0,e.p);
+        }
+      });
+      // comets
+      pulses.forEach(function(p){
+        var e=edges[p.e];if(!e||!e._q)return;
+        var fwd=e.a===p.from,stalled=e.broken&&p.t<.5;
+        for(var i=9;i>=0;i--){
+          var tt=p.t-i*.018;if(tt<0)continue;
+          var pt=bez(e._q,fwd?tt:1-tt),f=1-i/10;
+          ctx.beginPath();ctx.arc(pt.x,pt.y,2.1*f+.3,0,6.283);
+          ctx.fillStyle=stalled?'rgba('+CORAL+','+(.8*f)+')':'rgba('+p.col+','+(.75*f)+')';ctx.fill();
+        }
+        var h=bez(e._q,fwd?p.t:1-p.t);glow(h.x,h.y,12,stalled?.5:.55,stalled?CORAL:p.col);
+        ctx.beginPath();ctx.arc(h.x,h.y,2.2,0,6.283);ctx.fillStyle=stalled?'rgb('+CORAL+')':'#fff';ctx.fill();
+      });
+      // dots
+      var T=frame*.03;
+      nodes.forEach(function(n){
+        var P=proj(pos(n)),tw=.72+.28*Math.sin(T*(n.big?1.4:2.2)+n.ph),pop=n.s<1?1+(1-n.s)*1.8:1;
+        glow(P.x,P.y,n.R*(n.big?7:4)*pop,(n.big?.35:.2)*tw*Math.min(1,n.s*1.4),n.col);
+        ctx.beginPath();ctx.arc(P.x,P.y,n.R*pop,0,6.283);ctx.fillStyle='rgba('+n.col+','+(.55+.45*tw)*Math.min(1,.4+n.s)+')';ctx.fill();
+        if(n.big)sparkle(P.x,P.y,n.R*3.2*tw,.55*tw);
+        if(n.s<1){ctx.beginPath();ctx.arc(P.x,P.y,n.R+(1-n.s)*16,0,6.283);ctx.strokeStyle='rgba(255,255,255,'+(.5*(1-n.s))+')';ctx.lineWidth=1;ctx.stroke();}
+      });
+      ctx.globalAlpha=1;
+    }
+    function step(){
+      frame++;theta+=.0007;
+      nodes.forEach(function(n){if(n.s<1)n.s=Math.min(1,n.s+.045);});
+      edges.forEach(function(e){
+        if(e.p<1)e.p=Math.min(1,e.p+.035);
+        if(e.broken){e.heal--;if(e.heal<=0)e.broken=0;}
+        if(e.flash>0)e.flash-=.02;
+      });
+      if(phase==='grow'){if(frame%5===0)addNode();if(nodes.length>=target)phase='hold';}
+      else if(phase==='hold'){hold++;if(hold===90||hold===270)breakOne();if(hold>540)phase='fade';}
+      else{fade-=.018;if(fade<=0)reset();}
+      if(pulses.length<26&&frame%18===0)spawn();
+      pulses=pulses.filter(function(p){
+        var e=edges[p.e];if(!e)return false;var to=e.a===p.from?e.b:e.a;
+        if(e.broken&&p.t<.5){p.stall++;return p.stall<140;}
+        if(e.broken)return false;
+        p.t+=p.sp;
+        if(p.t>=1){p.hops--;if(p.hops<=0)return false;
+          var o=adj(to).filter(function(q){return q[0]!==p.e;});if(!o.length)return false;
+          var nx=o[Math.floor(Math.random()*o.length)];p.from=to;p.e=nx[0];p.t=0;}
+        return true;
+      });
+      draw();
+      if(!still&&visible)raf=requestAnimationFrame(step);
+    }
+    function full(){while(nodes.length<target)addNode();edges.forEach(function(e){e.p=1;});nodes.forEach(function(n){n.s=1;});draw();}
+    size();reset();
+    if(still)full();else raf=requestAnimationFrame(step);
+    var rt;window.addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(function(){size();reset();if(still)full();},200);});
+    if('IntersectionObserver' in window){new IntersectionObserver(function(es){
+      var v=es[0].isIntersecting;if(v&&!visible&&!still){visible=true;raf=requestAnimationFrame(step);}else visible=v;
+    }).observe(cv);}
+  })();
+
   // Reveal on scroll
   var els=[].slice.call(document.querySelectorAll('.reveal'));
   if('IntersectionObserver' in window){
@@ -355,31 +506,31 @@ a:focus-visible,button:focus-visible{outline:2px solid var(--coral);outline-offs
     els.forEach(function(el){io.observe(el);});
   }else{els.forEach(function(el){el.classList.add('in');});}
 
-  // Slide viewer
-  var N=7, cur=1;
-  var alts=['Title: Ripe for Disaster, Where Supply Chains Break',
-    'Michoacán: about 3 in 4 of Mexico’s avocados, 90% of exports to the US',
-    'The price tag leaves some things out: water, forests, conflict',
-    'Visualizing the problem with GIS: collect, match, map',
-    'Where the avocados are: 80% to 73%, 2014 vs 2024 map',
-    'What the price tag leaves out: homicides vs tree cover loss map',
-    'Questions? Contact Brandon Estevez'];
-  var img=document.getElementById('vimg'), count=document.getElementById('vcount'),
-      thumbs=document.getElementById('thumbs');
+  // Slide viewer: all 7 slides are real <img> elements already on the page; we only toggle a class.
+  var N=7, cur=1, PDF='assets/Ripe-for-Disaster-Spooky-Research-Slam-2026.pdf';
+  var slides=[].slice.call(document.querySelectorAll('.slide')),
+      count=document.getElementById('vcount'), thumbs=document.getElementById('thumbs');
+  function recover(img){
+    // one automatic retry with a cache-buster, then a readable text card instead of a broken-image icon
+    if(!img.dataset.retry){img.dataset.retry='1';img.src=img.getAttribute('src').split('?')[0]+'?v='+Date.now();return;}
+    var f=document.createElement('div');
+    f.className='slide slide-fallback'+(img.classList.contains('on')?' on':'');
+    f.innerHTML='<span>'+img.alt+'</span><a href="'+PDF+'" target="_blank" rel="noopener">Open the full deck (PDF)</a>';
+    var i=slides.indexOf(img);img.parentNode.replaceChild(f,img);slides[i]=f;
+  }
+  slides.forEach(function(img){
+    img.addEventListener('error',function(){recover(img);});
+    if(img.complete&&img.naturalWidth===0)recover(img);
+  });
   for(var i=1;i<=N;i++){
     var b=document.createElement('button');b.className='thumb'+(i===1?' on':'');b.setAttribute('aria-label','Go to slide '+i);
-    b.innerHTML='<img src="assets/slides/slide-'+i+'.jpg" alt="" loading="lazy">';
+    b.innerHTML='<img src="assets/slides/slide-'+i+'.jpg" alt="" decoding="async">';
     (function(n){b.addEventListener('click',function(){go(n);});})(i);
     thumbs.appendChild(b);
   }
   function go(n){
     cur=((n-1+N)%N)+1;
-    img.classList.add('swap');
-    setTimeout(function(){
-      img.src='assets/slides/slide-'+cur+'.jpg';img.alt=alts[cur-1];
-      img.onload=function(){img.classList.remove('swap');};
-      setTimeout(function(){img.classList.remove('swap');},400);
-    },180);
+    slides.forEach(function(el,k){el.classList.toggle('on',k===cur-1);});
     count.textContent='Slide '+cur+' / '+N;
     [].forEach.call(thumbs.children,function(t,k){t.classList.toggle('on',k===cur-1);});
   }
